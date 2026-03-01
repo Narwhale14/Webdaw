@@ -380,6 +380,7 @@ export class MiniSynth implements BaseSynth {
 
         const cleanup = () => {
             cleanupCallback();
+            if(voice.source instanceof AudioWorkletNode) voice.source.port.postMessage('stop');
             voice.source.disconnect();
             voice.filter.disconnect();
             voice.automationGain.disconnect();
@@ -401,6 +402,7 @@ export class MiniSynth implements BaseSynth {
         voice.envelopeGain.gain.linearRampToValueAtTime(0, time + MiniSynth.ANTI_CLICK_RAMP);
 
         const cleanup = () => {
+            if(voice.source instanceof AudioWorkletNode) voice.source.port.postMessage('stop');
             voice.source.disconnect();
             voice.filter.disconnect();
             voice.automationGain.disconnect();

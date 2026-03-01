@@ -15,7 +15,7 @@ import { DEFAULT_GLOBAL_VOLUME } from '../constants/defaults';
 import Menu from './modals/Menu.vue';
 import ConfirmationModal from './modals/ConfirmationModal.vue';
 import type { MenuItem } from './modals/Menu.vue';
-import { currentProjectId, saveManualProject, getAllProjects, loadProjectById, newProject, deleteCurrentProject, isSaving, scheduleAutosave} from '../services/saveStateManager';
+import { currentProjectId, saveManualProject, getAllProjects, loadProjectById, newProject, deleteCurrentProject, isSaving, scheduleAutosave, exportProject, importProject} from '../services/saveStateManager';
 import type { ProjectSummary } from '../services/saveStateManager';
 
 const engine = getAudioEngine();
@@ -26,6 +26,7 @@ watch(bpm, val => { bpmInput.value = String(val); });
 
 const snapMenu = ref<InstanceType<typeof Menu> | null>(null);
 const fileMenu = ref<InstanceType<typeof Menu> | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 const savedProjects = ref<ProjectSummary[]>([]);
 
@@ -100,9 +101,24 @@ const fileOptions = computed<MenuItem[]>(() => [
   },
   { separator: true },
 
+  { label: 'Export Project', action: () => { exportProject(); }},
+  { label: 'Import Project', action: () => { fileInput.value?.click() }},
+  { separator: true },
+
   { label: 'New Project', action: async () => { await newProject(); } },
   { label: 'Delete Project', disabled: currentProjectId.value === null, action: async () => { await deleteCurrentProject(); await refreshProjects(); } },
 ]);
+
+async function handleFileUpload(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if(!input.files?.length) return;
+
+  try {
+    await importProject(input.files[0]!);
+  } catch(error) {
+    console.log(error);
+  }
+}
 
 async function openFileMenu(event: MouseEvent) {
   const element = event.currentTarget as HTMLElement;
@@ -315,4 +331,7 @@ defineExpose({
     />
     <span v-if="saveError" class="text-xs text-red-400 font-mono">{{ saveError }}</span>
   </ConfirmationModal>
+
+  <!-- upload -->
+  <input type="file" accept=".kwv" ref="fileInput" style="display:none" @change="handleFileUpload"/>
 </template>

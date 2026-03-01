@@ -381,6 +381,37 @@ export async function loadAutoSave(): Promise<SaveFile | null> {
 
 // project management
 
+export function exportProject() {
+    const state = serializeState();
+    const json = JSON.stringify(state, null, 0);
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${state.metadata.projectName || 'project'}.kwv`;
+
+    URL.revokeObjectURL(url);
+}
+
+export async function importProject(file: File): Promise<void> {
+    const text = await file.text();
+    let parsed: SaveFile;
+
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        throw new Error('Invalid profile file (malformed JSON)');
+    }
+
+    if(!parsed.version || !parsed.metadata || !parsed.global) {
+        throw new Error('Invalid project file');
+    }
+
+    await deserializeState(parsed);
+}
+
 export async function getAllProjects(): Promise<ProjectSummary[]> {
     const all = await idbGetAll<SaveFile & { id: number }>(PROJECTS_STORE);
     return all.map(p => ({ id: p.id, name: p.metadata.projectName, lastModified: p.metadata.lastModified })).sort((a, b) => b.lastModified - a.lastModified);

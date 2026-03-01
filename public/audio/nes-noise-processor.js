@@ -22,9 +22,16 @@ export class NesNoiseProcessor extends AudioWorkletProcessor {
         super();
         this.lfsr = 1;
         this.phase = 0;
+        this._alive = true;
+        
+        this.port.onmessage = (e) => {
+            if(e.data === 'stop') this._alive = false;
+        };
     }
 
     process(inputs, outputs, parameters) {
+        if(!this._alive) return false;
+
         const channels = outputs[0];
         const freqParam = parameters.frequency;
         const modeParam = parameters.mode;
