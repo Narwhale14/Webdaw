@@ -189,6 +189,24 @@ function createTrack() {
 
 // HANDLERS
 
+function shiftClips(trackDelta: number, beatDelta: number) {
+  const hasSelection = state.selectedClipIds.size > 0;
+  const clipsToMove = hasSelection
+    ? arrangement.clips.filter(c => state.selectedClipIds.has(c.id))
+    : [...arrangement.clips];
+
+  const snapshots = clipsToMove.map(c => ({ id: c.id, track: c.track, startBeat: c.startBeat }));
+
+  for(const snap of snapshots) {
+    const newTrack = clamp(snap.track + trackDelta, 0, numTracks - 1);
+    const newBeat = Math.max(0, snap.startBeat + beatDelta);
+    arrangement.moveClip(snap.id, newTrack, newBeat);
+    engine.compiler.invalidateClip(snap.id);
+  }
+
+  recompileArrangement();
+}
+
 function handleKeyDown(event: KeyboardEvent) {
   const target = event.target as HTMLElement;
   if(['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
@@ -197,25 +215,45 @@ function handleKeyDown(event: KeyboardEvent) {
   if(!element) return;
 
   const stepSize = colWidth.value / 2;
-  const multiplier = event.shiftKey ? 4 : 1;
+
+  // Shift + Arrow: move clips (selected, or all if nothing selected)
+  if(event.shiftKey) {
+    switch(event.key) {
+      case 'ArrowUp':
+        event.preventDefault();
+        shiftClips(-1, 0);
+        return;
+      case 'ArrowDown':
+        event.preventDefault();
+        shiftClips(1, 0);
+        return;
+      case 'ArrowLeft':
+        event.preventDefault();
+        shiftClips(0, -1 / snapDivision.value);
+        return;
+      case 'ArrowRight': event.preventDefault();
+        shiftClips(0, 1 / snapDivision.value);
+        return;
+    }
+  }
 
   switch(event.key) {
     case 'ArrowUp':
       event.preventDefault();
-      element.scrollTop -= trackHeight * multiplier;
-      break;
+      element.scrollTop -= trackHeight;
+      return;
     case 'ArrowDown':
       event.preventDefault();
-      element.scrollTop += trackHeight * multiplier;
-      break;
+      element.scrollTop += trackHeight;
+      return;
     case 'ArrowLeft':
       event.preventDefault();
-      element.scrollLeft -= stepSize * multiplier;
-      break;
+      element.scrollLeft -= stepSize;
+      return;
     case 'ArrowRight':
       event.preventDefault();
-      element.scrollLeft += stepSize * multiplier;
-      break;
+      element.scrollLeft += stepSize;
+      return;
     case ' ':
       event.preventDefault();
       if(playbackMode.value === 'arrangement' && !engine.scheduler.isPlaying) {
@@ -223,24 +261,25 @@ function handleKeyDown(event: KeyboardEvent) {
       }
 
       engine.scheduler.toggle();
-      break;
+      return;
     case 'Enter':
       event.preventDefault();
       engine.scheduler.seek(engine.scheduler.loopStart);
-      break;
+      return;
     case 'Escape':
       event.preventDefault();
       state.selectedClipIds.clear();
-      break;;
+      return;;
     case 'p':
       event.preventDefault();
-      if(!arrangementTools.some(tool => tool.id === 'place')) break;
+      if(!arrangementTools.some(tool => tool.id === 'place')) return;
       activeTool.value = 'place';
-      break;
+      return;
     case 'e':
       event.preventDefault();
-      if(!arrangementTools.some(tool => tool.id === 'select')) break;
+      if(!arrangementTools.some(tool => tool.id === 'select')) return;
       activeTool.value = 'select';
+      return
   }
 }
 
@@ -295,7 +334,10 @@ function handlePointerDown(event: PointerEvent) {
   const track = Math.floor(y / trackHeight);
 
   const clip = arrangement.getClipAt(track, rawBeat);
-  if(!clip) return;
+  if(!clip) {
+    if(!event.shiftKey) state.selectedClipIds.clear();
+    return;
+  }
 
   if(event.button === 2) {
     state.selectedClipIds.delete(clip.id);

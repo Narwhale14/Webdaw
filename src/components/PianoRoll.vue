@@ -253,33 +253,95 @@ function handleWheel(event: WheelEvent) {
   }
 }
 
+function shiftNotes(rowDelta: number, colDelta: number) {
+  const hasSelection = state.selectedNoteIds.size > 0;
+  const notesToMove = hasSelection
+    ? props.roll.getNoteData.filter(n => state.selectedNoteIds.has(n.id))
+    : [...props.roll.getNoteData];
+
+  const snapshots = notesToMove.map(n => ({ id: n.id, origMidi: n.midi, row: n.row, col: n.col }));
+
+  for(const snap of snapshots) {
+    const newRow = snap.row + rowDelta;
+    const newCol = Math.max(0, snap.col + colDelta);
+    props.roll.move(snap.id, newRow, newCol);
+
+    const updated = props.roll.getNoteData.find(n => n.id === snap.id);
+    if(updated) {
+      if(rowDelta !== 0) props.roll.followNoteMove(snap.id, snap.origMidi, updated.midi);
+      engine.scheduler.updateNote(snap.id, { startTime: updated.col, pitch: updated.midi });
+    }
+  }
+
+  updatePatternLoop();
+}
+
 function onPianoRollKeyDown(event: KeyboardEvent) {
   const target = event.target as HTMLElement;
   if(['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
+
+  event.stopPropagation();
 
   const element = pianoRollContainer.value;
   if(!element) return;
 
   const stepSize = colWidth.value / 2;
-  const multiplier = event.shiftKey ? 4 : 1;
+
+  // ctrl + arrow up/down
+  if(event.ctrlKey) {
+    switch(event.key) {
+      case 'ArrowUp':
+        event.preventDefault(); 
+        shiftNotes(-12, 0); 
+        return;
+      case 'ArrowDown': 
+        event.preventDefault(); 
+        shiftNotes(12, 0); 
+        return;
+    }
+
+    return;
+  }
+
+  // shift + arrow
+  if(event.shiftKey) {
+    switch(event.key) {
+      case 'ArrowUp':
+        event.preventDefault();
+        shiftNotes(-1, 0);
+        return;
+      case 'ArrowDown':
+        event.preventDefault();
+        shiftNotes(1, 0);
+        return;
+      case 'ArrowLeft':
+        event.preventDefault();
+        shiftNotes(0, -1 / snapDivision.value);
+        return;
+      case 'ArrowRight':
+        event.preventDefault();
+        shiftNotes(0, 1 / snapDivision.value);
+        return;
+    }
+  }
 
   switch(event.key) {
     case 'ArrowUp':
       event.preventDefault();
-      element.scrollTop -= rowHeight.value * multiplier;
-      break;
+      element.scrollTop -= rowHeight.value;
+      return;
     case 'ArrowDown':
       event.preventDefault();
-      element.scrollTop += rowHeight.value * multiplier;
-      break;
+      element.scrollTop += rowHeight.value;
+      return;
     case 'ArrowLeft':
       event.preventDefault();
-      element.scrollLeft -= stepSize * multiplier;
-      break;
+      element.scrollLeft -= stepSize;
+      return;
     case 'ArrowRight':
       event.preventDefault();
-      element.scrollLeft += stepSize * multiplier;
-      break;
+      element.scrollLeft += stepSize;
+      return;
     case 'Delete': {
       event.preventDefault();
       if(state.selectedNoteIds.size === 0) return;
@@ -294,25 +356,25 @@ function onPianoRollKeyDown(event: KeyboardEvent) {
 
       state.selectedNoteIds.clear();
       updatePatternLoop();
-      break;
+      return;
     }
     case 'Escape':
       event.preventDefault();
       state.selectedNoteIds.clear();
       if(activeAutomationLane.value) activeAutomationLane.value = null;
-      break;
+      return;
     case 'Enter':
       event.preventDefault();
       engine.scheduler.seek(engine.scheduler.loopStart);
       break;
     case 'p':
-      if(!pianoRollTools.some(tool => tool.id === 'place')) break;
+      if(!pianoRollTools.some(tool => tool.id === 'place')) return;
       activeTool.value = 'place';
-      break;
+      return;
     case 'e':
-      if(!pianoRollTools.some(tool => tool.id === 'select')) break;
+      if(!pianoRollTools.some(tool => tool.id === 'select')) return;
       activeTool.value = 'select';
-      break;
+      return;
   }
 }
 
