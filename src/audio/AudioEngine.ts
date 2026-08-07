@@ -59,7 +59,7 @@ export class AudioEngine {
     }
 
     private async _initAudioWorklet(ctx: AudioContext) {
-        await ctx.audioWorklet.addModule('/audio/nes-noise-processor.js');
+        await ctx.audioWorklet.addModule(`${import.meta.env.BASE_URL}audio/nes-noise-processor.js`);
     }
 
     // SYNTH REGISTRY
